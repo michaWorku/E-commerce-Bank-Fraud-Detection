@@ -1,0 +1,8 @@
+# Add your project dependencies here
+# Example:
+# pandas
+# numpy
+# scikit-learn
+# dvc
+# pytest
+# flake8
