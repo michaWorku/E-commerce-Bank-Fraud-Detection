@@ -1,8 +1,30 @@
-# Add your project dependencies here
-# Example:
-# pandas
-# numpy
-# scikit-learn
-# dvc
-# pytest
-# flake8
+# Core Data Handling
+pandas
+numpy
+sidetable
+
+# EDA & Visualization
+matplotlib
+seaborn
+plotly
+
+# Machine learning libraries
+scikit-learn
+lightgbm # Or 
+xgboost
+imbalanced-learn # For handling class imbalance (e.g., SMOTE)
+
+# Model Interpretability
+shap
+lime
+# Dev Tools
+ipykernel
+jupyter
+python-dotenv
+
+
+# Development and testing tools (optional, but good practice)
+pytest # For unit and integration testing
+flake8 # For code linting
+black # For code formatting
+dvc # For Data Version Control
