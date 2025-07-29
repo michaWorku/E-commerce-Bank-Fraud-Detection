@@ -57,8 +57,7 @@ This initiative involves a multi-faceted approach to fraud detection:
 │   └── report.md            # Final project report/blog post content
 ├── notebooks/               # Jupyter notebooks for experimentation, EDA, and prototyping
 │   ├── 1.0-eda.ipynb
-│   ├── 02_Feature_Engineering.ipynb
-│   └── 03_Model_Experimentation.ipynb
+│   └── 02_Model_Experimentation.ipynb
 ├── src/                     # Core source code for the project
 │   ├── __init__.py          # Marks src as a Python package
 │   ├── main.py              # Main script to run the fraud detection pipeline
