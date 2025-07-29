@@ -48,13 +48,15 @@ This initiative involves a multi-faceted approach to fraud detection:
 │   └── settings.json
 ├── config/                  # Configuration files (e.g., model hyperparameters, data paths)
 │   └── config.py
+├── scripts/                 # Standalone utility scripts
+│   └── run_data_pipeline.py # Script to run the fraud detection pipeline
 ├── data/                    # Data storage
 │   ├── raw/                 # Original, immutable raw datasets
 │   └── processed/           # Transformed, cleaned, or feature-engineered data
 ├── docs/                    # Project documentation, reports, and insights
 │   └── report.md            # Final project report/blog post content
 ├── notebooks/               # Jupyter notebooks for experimentation, EDA, and prototyping
-│   ├── 01_EDA.ipynb
+│   ├── 1.0-eda.ipynb
 │   ├── 02_Feature_Engineering.ipynb
 │   └── 03_Model_Experimentation.ipynb
 ├── src/                     # Core source code for the project
