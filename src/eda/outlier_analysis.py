@@ -6,13 +6,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np # For numerical operations
 
-# Attempt to import cudf for GPU acceleration
-try:
-    import cudf
-    _CUDF_AVAILABLE_EDA = True
-except ImportError:
-    _CUDF_AVAILABLE_EDA = False
-
 
 # Abstract Base Class for Outlier Analysis Strategy
 # -------------------------------------------------
@@ -41,7 +34,6 @@ class IQRBasedOutlierAnalysis(OutlierAnalysisStrategy):
     def analyze(self, df: pd.DataFrame, feature: str):
         """
         Detects and visualizes outliers in a numerical feature using the IQR method.
-        Handles both pandas and cuDF DataFrames by converting to pandas for analysis.
 
         Parameters:
         df (pd.DataFrame): The dataframe containing the data.
@@ -50,11 +42,7 @@ class IQRBasedOutlierAnalysis(OutlierAnalysisStrategy):
         Returns:
         None: Displays a box plot and prints outlier counts.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if feature not in df_processed.columns:
             print(f"Error: Feature '{feature}' not found in DataFrame.")
@@ -151,9 +139,9 @@ if __name__ == "__main__":
 
     print("--- Outlier Analysis Examples (Real Data) ---")
 
-    # Load raw data (using pandas for independent testing simplicity)
-    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, use_gpu=False, column_dtypes={'ip_address': str})
-    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, use_gpu=False, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
+    # Load raw data
+    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, column_dtypes={'ip_address': str})
+    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
 
     if not fraud_data_df_raw.empty and not ip_country_df_raw.empty:
         # Merge IP addresses to countries
