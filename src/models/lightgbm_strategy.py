@@ -1,44 +1,47 @@
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+import lightgbm as lgb
+
 from pathlib import Path
 import sys
-
-# Add project root to sys.path
-project_root = Path(__file__).resolve().parents[2] # Adjust path as needed
+project_root = Path.cwd()
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from src.models.base_model_strategy import BaseModelStrategy
 
 
-class RandomForestStrategy(BaseModelStrategy):
+class LightGBMStrategy(BaseModelStrategy):
     """
-    Concrete strategy for Random Forest model (Regressor or Classifier).
+    Concrete strategy for LightGBM model (Regressor or Classifier).
     """
     def __init__(self, model_type: str = 'regressor', random_state: int = 42, **kwargs):
         """
-        Initializes the Random Forest model.
+        Initializes the LightGBM model.
 
         Parameters:
         model_type (str): Type of model to use: 'regressor' or 'classifier'.
         random_state (int): Random seed for reproducibility.
-        kwargs: Additional parameters for RandomForestRegressor or RandomForestClassifier.
+        kwargs: Additional parameters for lgb.LGBMRegressor or lgb.LGBMClassifier.
         """
         super().__init__()
         self.model_type = model_type
-        self._name = "Random Forest Regressor" if model_type == 'regressor' else "Random Forest Classifier"
+        self._name = "LightGBM Regressor" if model_type == 'regressor' else "LightGBM Classifier"
 
         if model_type == 'regressor':
-            self.model = RandomForestRegressor(random_state=random_state, **kwargs)
+            self.model = lgb.LGBMRegressor(random_state=random_state, **kwargs)
         elif model_type == 'classifier':
-            self.model = RandomForestClassifier(random_state=random_state, **kwargs)
+            self.model = lgb.LGBMClassifier(random_state=random_state, **kwargs)
         else:
-            raise ValueError("model_type must be 'regressor' or 'classifier'.")
+            raise ValueError(f"Unsupported model_type: {model_type}. Choose 'regressor' or 'classifier'.")
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     def train(self, X: pd.DataFrame, y: pd.Series):
         """
-        Trains the Random Forest model.
+        Trains the LightGBM model.
 
         Parameters:
         X (pd.DataFrame): Training features.
@@ -54,7 +57,7 @@ class RandomForestStrategy(BaseModelStrategy):
 
     def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
-        Makes predictions using the trained Random Forest model.
+        Makes predictions using the trained LightGBM model.
 
         Parameters:
         X (pd.DataFrame): Features for prediction.
@@ -70,23 +73,12 @@ class RandomForestStrategy(BaseModelStrategy):
             
         if self.model_type == 'classifier':
             # For classification, return probabilities for the positive class (class 1)
-            # This is crucial for metrics like ROC-AUC and for LIME
-            if hasattr(self.model, 'predict_proba'):
-                return self.model.predict_proba(X)[:, 1]
-            else:
-                raise AttributeError(f"Classifier model '{self.name}' does not have 'predict_proba' method. "
-                                     "Ensure it's a classifier that supports probability prediction.")
+            # This is crucial for metrics like ROC-AUC
+            return self.model.predict_proba(X)[:, 1]
         return self.model.predict(X)
 
     def get_model(self):
         """
-        Returns the trained Random Forest model object.
+        Returns the trained LightGBM model object.
         """
         return self.model
-
-    @property
-    def name(self) -> str:
-        """
-        Returns the name of the model strategy.
-        """
-        return self._name

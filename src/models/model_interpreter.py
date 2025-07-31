@@ -4,6 +4,9 @@ import lime.lime_tabular
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
+from sklearn.tree import DecisionTreeClassifier
+import xgboost as xgb
 
 class ModelInterpreter:
     """
@@ -27,220 +30,149 @@ class ModelInterpreter:
             max_background_samples_lime (int): Maximum number of samples to use for LIME's
                                                background data, to prevent MemoryErrors.
         """
+        if model_type not in ['regression', 'classification']:
+            raise ValueError("model_type must be 'regression' or 'classification'.")
+        if model_type == 'classification' and class_names is None:
+            raise ValueError("class_names must be provided for classification models.")
+
         self.model = model
         self.feature_names = feature_names
         self.model_type = model_type
         self.class_names = class_names
-        self.training_data_for_lime = training_data_for_lime # Store for LIME
-        self.max_background_samples_shap = max_background_samples_shap # Store for SHAP sampling
-        self.max_background_samples_lime = max_background_samples_lime # Store for LIME sampling
+        self.training_data_for_lime = training_data_for_lime
+        self.max_background_samples_shap = max_background_samples_shap
+        self.max_background_samples_lime = max_background_samples_lime
 
-        if self.model_type not in ['regression', 'classification']:
-            raise ValueError("model_type must be 'regression' or 'classification'.")
-        if self.model_type == 'classification' and not self.class_names:
-            raise ValueError("class_names must be provided for classification models.")
-        
         # Initialize SHAP explainer
-        self.shap_explainer = self._initialize_shap_explainer()
-
-    def _initialize_shap_explainer(self):
-        """Initializes the appropriate SHAP explainer based on model type."""
-        
-        # Determine if the model is a tree-based model (for efficiency with TreeExplainer)
-        # Using string matching on model type is generally robust
-        is_tree_model = any(
-            x in str(type(self.model)) for x in ["XGB", "LGBM", "CatB", "DecisionTree", "RandomForest"]
-        )
+        is_tree_model = isinstance(self.model, (
+            DecisionTreeClassifier, RandomForestClassifier, GradientBoostingClassifier,
+            xgb.XGBClassifier, xgb.XGBRegressor
+        ))
 
         if is_tree_model:
             print("Initializing TreeExplainer for SHAP (efficient for tree-based models).")
-            # TreeExplainer is fast and can handle the full dataset, no explicit sampling needed here
-            return shap.TreeExplainer(self.model)
+            self.explainer_shap = shap.TreeExplainer(self.model)
         else:
-            print("Initializing KernelExplainer for SHAP (model-agnostic, can be slower).")
-            # For KernelExplainer, the background dataset needs to be sampled to prevent MemoryErrors.
-            background_data = self.training_data_for_lime # Use the same training data as for LIME
-            if background_data is None:
-                print("Warning: training_data_for_lime not provided for KernelExplainer. "
-                      "Using a small dummy background. SHAP values may be less reliable.")
-                background_data = np.zeros((1, len(self.feature_names)))
+            print("Initializing KernelExplainer for SHAP (general purpose).")
+            if self.training_data_for_lime is not None and len(self.training_data_for_lime) > self.max_background_samples_shap:
+                print(f"Sampling {self.max_background_samples_shap} background samples for SHAP KernelExplainer.")
+                if isinstance(self.training_data_for_lime, np.ndarray):
+                    background_data = pd.DataFrame(self.training_data_for_lime, columns=self.feature_names).sample(
+                        n=self.max_background_samples_shap, random_state=42
+                    )
+                else:
+                    background_data = self.training_data_for_lime.sample(
+                        n=self.max_background_samples_shap, random_state=42
+                    )
+            elif self.training_data_for_lime is not None:
+                background_data = self.training_data_for_lime
+            else:
+                raise ValueError("training_data_for_lime must be provided for KernelExplainer if not a tree model.")
             
-            # If background data is a pandas DataFrame, convert to numpy array
             if isinstance(background_data, pd.DataFrame):
                 background_data = background_data.values
 
-            # Sample the background data if it's too large for KernelExplainer
-            if background_data.shape[0] > self.max_background_samples_shap:
-                print(f"Sampling KernelExplainer background data from {background_data.shape[0]} "
-                      f"to {self.max_background_samples_shap} instances to reduce memory usage.")
-                rng = np.random.default_rng(42) # Ensure reproducibility of sampling
-                sample_indices = rng.choice(background_data.shape[0], self.max_background_samples_shap, replace=False)
-                background_data_sampled = background_data[sample_indices, :]
-            else:
-                background_data_sampled = background_data
-            
-            # Ensure the background data is numerical (float) for KernelExplainer
-            if not np.issubdtype(background_data_sampled.dtype, np.number):
-                print(f"Warning: KernelExplainer background data is not purely numerical (dtype: {background_data_sampled.dtype}). Attempting to convert to float.")
-                try:
-                    background_data_sampled = background_data_sampled.astype(float)
-                except ValueError:
-                    print("Error: KernelExplainer background data cannot be converted to float. SHAP may fail.")
-            
-            # For classification, SHAP often works best with predict_proba
+            # Ensure predict_proba is used for classification if available, otherwise predict
             if self.model_type == 'classification' and hasattr(self.model, 'predict_proba'):
-                return shap.KernelExplainer(self.model.predict_proba, background_data_sampled)
+                predict_fn_for_shap = self.model.predict_proba
             else:
-                # For regression or classification models without predict_proba
-                return shap.KernelExplainer(self.model.predict, background_data_sampled)
+                predict_fn_for_shap = self.model.predict
 
+            self.explainer_shap = shap.KernelExplainer(predict_fn_for_shap, background_data)
 
     def explain_model_shap(self, X_data: pd.DataFrame):
         """
-        Generates SHAP values for the given data and stores them.
+        Generates SHAP values for the entire dataset or a sample of it.
 
-        Args:
-            X_data (pd.DataFrame): The input data (e.g., test set) for SHAP explanation.
+        Parameters:
+        X_data (pd.DataFrame): The dataset (or a sample) for which to generate SHAP values.
         """
+        if X_data.empty:
+            print("Input DataFrame for SHAP is empty. Skipping SHAP explanation.")
+            return
+
         print(f"Generating SHAP explanations for {len(X_data)} instances...")
+        shap_values = self.explainer_shap.shap_values(X_data)
         
-        # Convert to numpy array explicitly for compatibility with shap explainers
-        if isinstance(X_data, pd.DataFrame):
-            X_data_np = X_data.values
+        if self.model_type == 'classification':
+            self.shap_values = shap_values[1] if isinstance(shap_values, list) else shap_values
         else:
-            X_data_np = X_data
-
-        # Ensure the data for explanation is numerical (float)
-        if not np.issubdtype(X_data_np.dtype, np.number):
-            print(f"Warning: X_data for SHAP is not purely numerical (dtype: {X_data_np.dtype}). Attempting to convert to float.")
-            try:
-                X_data_np = X_data_np.astype(float)
-            except ValueError:
-                print("Error: X_data for SHAP cannot be converted to float. SHAP may fail.")
-
-        if isinstance(self.shap_explainer, shap.TreeExplainer):
-            # TreeExplainer can often handle DataFrame directly, but numpy array is safer universally.
-            self.shap_values = self.shap_explainer.shap_values(X_data) # Use original X_data (DataFrame) for TreeExplainer if preferred, or X_data_np
-        else:
-            # For KernelExplainer, ensure data is numpy array
-            self.shap_values = self.shap_explainer.shap_values(X_data_np)
+            self.shap_values = shap_values
         print("SHAP values generated.")
 
     def plot_shap_summary(self, X_data: pd.DataFrame):
         """
-        Generates and displays a SHAP summary plot.
-        Requires shap_values to be generated first.
-
-        Args:
-            X_data (pd.DataFrame): The input data (e.g., test set) used for SHAP explanation.
+        Plots a SHAP summary plot (e.g., beeswarm or bar).
         """
-        if not hasattr(self, 'shap_values'):
-            print("Error: SHAP values not generated. Run explain_model_shap() first.")
+        if self.shap_values is None:
+            print("SHAP values not generated. Call explain_model_shap() first.")
             return
-
-        print("Displaying SHAP summary plot...")
-        plt.figure(figsize=(10, 6))
         
-        # For classification, shap_values will be a list of arrays (one per class)
-        if self.model_type == 'classification' and isinstance(self.shap_values, list):
-            # For binary classification, typically explain class 1 (positive class)
-            shap_values_to_plot = self.shap_values[1] 
-            # If multi-class, can choose one, or sum absolute values
-        else:
-            shap_values_to_plot = self.shap_values
-
-        shap.summary_plot(shap_values_to_plot, X_data, feature_names=self.feature_names, show=False)
-        plt.title('SHAP Summary Plot: Global Feature Importance')
+        print("Displaying SHAP summary plot...")
+        shap.summary_plot(self.shap_values, X_data, feature_names=self.feature_names, show=False)
+        plt.title('SHAP Summary Plot')
         plt.tight_layout()
         plt.show()
 
-    def explain_instance_lime(self, instance: pd.Series):
+    def explain_instance_lime(self, instance: np.ndarray):
         """
-        Generates and displays a LIME explanation for a single instance.
+        Generates and prints a LIME explanation for a single instance.
 
-        Args:
-            instance (pd.Series): A single data instance (row) to explain.
+        Parameters:
+        instance (np.ndarray): A single data instance (row) as a NumPy array.
         """
-        if self.training_data_for_lime is None:
-            print("Error: training_data_for_lime was not provided during ModelInterpreter initialization. LIME cannot be used.")
+        if instance.size == 0:
+            print("Input instance for LIME is empty. Skipping LIME explanation.")
             return
 
-        print(f"Generating LIME explanation for instance (first few features):\n{instance.head().to_string()}") # Show head for brevity if long
-        
-        # Ensure training data for LIME is numerical NumPy array
-        if isinstance(self.training_data_for_lime, pd.DataFrame):
-            kernel_training_data = self.training_data_for_lime.values
-        else:
-            kernel_training_data = self.training_data_for_lime
+        if self.training_data_for_lime is None or self.training_data_for_lime.size == 0:
+            print("LIME training data (background data) is not available or empty. Cannot perform LIME explanation.")
+            return
 
-        # Convert training data to float and handle potential NaNs before LIME initialization
-        if not np.issubdtype(kernel_training_data.dtype, np.number):
-             print(f"Warning: training_data_for_lime is not purely numerical (dtype: {kernel_training_data.dtype}). Attempting to convert to float for LIME.")
-             try:
-                 kernel_training_data = kernel_training_data.astype(float)
-             except ValueError:
-                 print("Error: training_data_for_lime cannot be converted to float. LIME requires numerical data. Skipping LIME explanation.")
-                 return
-        
-        # LIME's internal NearestNeighbors can struggle with NaNs, so fill them or ensure data is clean
-        if np.isnan(kernel_training_data).any():
-            print("Warning: NaN values found in training_data_for_lime. LIME may behave unexpectedly. Filling with 0.")
-            kernel_training_data = np.nan_to_num(kernel_training_data, nan=0.0) # Simple fill, more advanced strategies might be needed
+        instance_values = np.array(instance).flatten()
 
-        # --- NEW: Sample LIME background data if it's too large ---
-        if kernel_training_data.shape[0] > self.max_background_samples_lime:
-            print(f"Sampling LIME background data from {kernel_training_data.shape[0]} "
-                  f"to {self.max_background_samples_lime} instances to reduce memory usage.")
-            rng = np.random.default_rng(42) # Use same seed for reproducibility
-            sample_indices = rng.choice(kernel_training_data.shape[0], self.max_background_samples_lime, replace=False)
-            kernel_training_data_sampled = kernel_training_data[sample_indices, :]
-        else:
-            kernel_training_data_sampled = kernel_training_data
+        if len(instance_values) != len(self.feature_names):
+            print(f"ERROR: Instance to explain has {len(instance_values)} features, but expected {len(self.feature_names)}. Cannot perform LIME explanation.")
+            return
 
+        kernel_training_data_sampled = self.training_data_for_lime
+        if kernel_training_data_sampled.ndim == 1:
+            kernel_training_data_sampled = kernel_training_data_sampled.reshape(1, -1)
 
-        # Ensure the instance to explain is a numpy array (LIME expects this)
-        if isinstance(instance, pd.Series):
-            instance_values = instance.values
-        else:
-            instance_values = instance
-        
-        # Convert instance to float and handle potential NaNs
-        if not np.issubdtype(instance_values.dtype, np.number):
-             print(f"Warning: Instance for LIME is not purely numerical (dtype: {instance_values.dtype}). Attempting to convert to float.")
-             try:
-                 instance_values = instance_values.astype(float)
-             except ValueError:
-                 print("Error: Instance for LIME cannot be converted to float. LIME may fail.")
-                 return
         if np.isnan(instance_values).any():
-            print("Warning: NaN values found in instance. LIME may behave unexpectedly. Filling with 0.")
+            print("Warning: NaNs found in instance to explain for LIME. This can cause LIME to behave unexpectedly. Filling with 0.")
             instance_values = np.nan_to_num(instance_values, nan=0.0)
 
-        # Initialize LimeTabularExplainer internally
-        # LIME takes the *raw* training data for its background, now sampled
-        # It's important that this training_data is numerically processed.
+        # Determine predict_fn for LIME based on model_type and availability
+        if self.model_type == 'classification':
+            if hasattr(self.model, 'predict_proba'):
+                predict_fn = self.model.predict_proba
+            else:
+                # This is the critical check that caused the error.
+                # If predict_proba is missing for a classifier, LIME cannot proceed.
+                raise NotImplementedError(f"Classifier model '{type(self.model).__name__}' does not have 'predict_proba' method, which is required for LIME classification explanation. "
+                                          "Please ensure you are using a classifier that provides probability scores.")
+        else: # Regression
+            predict_fn = self.model.predict
+
         explainer = lime.lime_tabular.LimeTabularExplainer(
-            training_data=kernel_training_data_sampled, # Use sampled data here
+            training_data=kernel_training_data_sampled,
             feature_names=self.feature_names,
             class_names=self.class_names if self.model_type == 'classification' else ['Prediction'],
             mode=self.model_type
         )
 
-        # Generate explanation
-        predict_fn = self.model.predict_proba if self.model_type == 'classification' and hasattr(self.model, 'predict_proba') else self.model.predict
-
         explanation = explainer.explain_instance(
             data_row=instance_values,
             predict_fn=predict_fn,
-            num_features=min(10, len(self.feature_names)) # Limit features for readability
+            num_features=min(10, len(self.feature_names))
         )
         
-        # Print explanation as text
-        print("\nLIME Explanation (Feature Contribution to Prediction):")
+        print("LIME Explanation (Feature Contribution to Prediction):")
+        print(f"Instance values (first 5 features): {instance_values[:5]}")
         for feature, weight in explanation.as_list():
             print(f"  {feature}: {weight:.4f}")
 
-        # Optional: Display explanation plot (if running in notebook environment)
         explanation.as_pyplot_figure()
         plt.title('LIME Explanation for Single Instance')
         plt.tight_layout()

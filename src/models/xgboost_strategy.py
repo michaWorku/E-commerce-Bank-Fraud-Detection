@@ -32,21 +32,15 @@ class XGBoostStrategy(BaseModelStrategy):
         if model_type == 'regressor':
             self.model = xgb.XGBRegressor(random_state=random_state, **kwargs)
         elif model_type == 'classifier':
-            # Default objective for binary classification is 'binary:logistic'
-            # Ensure use_label_encoder=False and eval_metric for modern XGBoost
+            # ABSOLUTE FINAL FIX: Removed hardcoded 'objective' and 'eval_metric' here.
+            # These parameters should ONLY be passed via kwargs from the caller (e.g., notebook)
+            # if specific values are desired, or XGBoost will use its own sensible defaults.
             self.model = xgb.XGBClassifier(
-                objective='binary:logistic',
-                eval_metric='logloss', # Common metric for binary classification
-                use_label_encoder=False, # Suppress warning for future versions
                 random_state=random_state,
                 **kwargs
             )
         else:
             raise ValueError(f"Unsupported model_type: {model_type}. Choose 'regressor' or 'classifier'.")
-
-    @property
-    def name(self) -> str:
-        return self._name
 
     def train(self, X: pd.DataFrame, y: pd.Series):
         """
@@ -92,3 +86,9 @@ class XGBoostStrategy(BaseModelStrategy):
         """
         return self.model
 
+    @property
+    def name(self) -> str:
+        """
+        Returns the name of the model strategy.
+        """
+        return self._name
