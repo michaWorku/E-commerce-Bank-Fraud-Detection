@@ -22,6 +22,9 @@ ipykernel
 jupyter
 python-dotenv
 
+tqdm
+mlflow
+cloudpickle
 
 # Development and testing tools (optional, but good practice)
 pytest # For unit and integration testing
