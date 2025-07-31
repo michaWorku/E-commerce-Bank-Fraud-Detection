@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
-
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from pathlib import Path
 import sys
-project_root = Path.cwd()
+
+# Add project root to sys.path
+project_root = Path(__file__).resolve().parents[2] # Adjust path as needed
 if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
@@ -15,13 +16,12 @@ class RandomForestStrategy(BaseModelStrategy):
     """
     Concrete strategy for Random Forest model (Regressor or Classifier).
     """
-    def __init__(self, model_type: str = 'regressor', n_estimators: int = 100, random_state: int = 42, **kwargs):
+    def __init__(self, model_type: str = 'regressor', random_state: int = 42, **kwargs):
         """
         Initializes the Random Forest model.
 
         Parameters:
         model_type (str): Type of model to use: 'regressor' or 'classifier'.
-        n_estimators (int): The number of trees in the forest.
         random_state (int): Random seed for reproducibility.
         kwargs: Additional parameters for RandomForestRegressor or RandomForestClassifier.
         """
@@ -30,15 +30,11 @@ class RandomForestStrategy(BaseModelStrategy):
         self._name = "Random Forest Regressor" if model_type == 'regressor' else "Random Forest Classifier"
 
         if model_type == 'regressor':
-            self.model = RandomForestRegressor(n_estimators=n_estimators, random_state=random_state, **kwargs)
+            self.model = RandomForestRegressor(random_state=random_state, **kwargs)
         elif model_type == 'classifier':
-            self.model = RandomForestClassifier(n_estimators=n_estimators, random_state=random_state, **kwargs)
+            self.model = RandomForestClassifier(random_state=random_state, **kwargs)
         else:
-            raise ValueError(f"Unsupported model_type: {model_type}. Choose 'regressor' or 'classifier'.")
-
-    @property
-    def name(self) -> str:
-        return self._name
+            raise ValueError("model_type must be 'regressor' or 'classifier'.")
 
     def train(self, X: pd.DataFrame, y: pd.Series):
         """
@@ -74,8 +70,12 @@ class RandomForestStrategy(BaseModelStrategy):
             
         if self.model_type == 'classifier':
             # For classification, return probabilities for the positive class (class 1)
-            # This is crucial for metrics like ROC-AUC
-            return self.model.predict_proba(X)[:, 1]
+            # This is crucial for metrics like ROC-AUC and for LIME
+            if hasattr(self.model, 'predict_proba'):
+                return self.model.predict_proba(X)[:, 1]
+            else:
+                raise AttributeError(f"Classifier model '{self.name}' does not have 'predict_proba' method. "
+                                     "Ensure it's a classifier that supports probability prediction.")
         return self.model.predict(X)
 
     def get_model(self):
@@ -84,3 +84,9 @@ class RandomForestStrategy(BaseModelStrategy):
         """
         return self.model
 
+    @property
+    def name(self) -> str:
+        """
+        Returns the name of the model strategy.
+        """
+        return self._name

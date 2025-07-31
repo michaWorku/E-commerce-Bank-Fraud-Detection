@@ -4,13 +4,6 @@ import pandas as pd
 import sys
 import numpy as np # For np.number in select_dtypes
 
-# Attempt to import cudf for GPU acceleration
-try:
-    import cudf
-    _CUDF_AVAILABLE_EDA = True
-except ImportError:
-    _CUDF_AVAILABLE_EDA = False
-
 
 # Abstract Base Class for Data Inspection Strategies
 # --------------------------------------------------
@@ -38,7 +31,6 @@ class DataTypesAndNonNullInspectionStrategy(DataInspectionStrategy):
     def inspect(self, df: pd.DataFrame):
         """
         Inspects and prints the data types and non-null counts of the dataframe columns.
-        Handles both pandas and cuDF DataFrames by converting to pandas for inspection.
 
         Parameters:
         df (pd.DataFrame): The dataframe to be inspected.
@@ -46,11 +38,7 @@ class DataTypesAndNonNullInspectionStrategy(DataInspectionStrategy):
         Returns:
         None: Prints the data types and non-null counts to the console.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         print("\n--- Data Types and Non-null Counts ---")
         if df_processed.empty:
@@ -73,7 +61,6 @@ class SummaryStatisticsInspectionStrategy(DataInspectionStrategy):
     def inspect(self, df: pd.DataFrame):
         """
         Inspects and prints descriptive statistics for numerical columns of the dataframe.
-        Handles both pandas and cuDF DataFrames by converting to pandas for inspection.
 
         Parameters:
         df (pd.DataFrame): The dataframe to be inspected.
@@ -81,11 +68,7 @@ class SummaryStatisticsInspectionStrategy(DataInspectionStrategy):
         Returns:
         None: Prints the descriptive statistics to the console.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         print("\n--- Summary Statistics ---")
         if df_processed.empty:
@@ -151,9 +134,9 @@ if __name__ == "__main__":
 
     print("--- Basic Data Inspection Examples (Real Data) ---")
 
-    # Load raw data (using pandas for independent testing simplicity)
-    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, use_gpu=False, column_dtypes={'ip_address': str})
-    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, use_gpu=False, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
+    # Load raw data
+    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, column_dtypes={'ip_address': str})
+    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
 
     if not fraud_data_df_raw.empty and not ip_country_df_raw.empty:
         # Merge IP addresses to countries

@@ -6,13 +6,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np # For numerical operations like np.finfo
 
-# Attempt to import cudf for GPU acceleration
-try:
-    import cudf
-    _CUDF_AVAILABLE_EDA = True
-except ImportError:
-    _CUDF_AVAILABLE_EDA = False
-
 
 # Abstract Base Class for Bivariate Analysis Strategy
 # ----------------------------------------------------
@@ -43,7 +36,6 @@ class NumericalVsNumericalAnalysis(BivariateAnalysisStrategy):
         """
         Analyzes the relationship between two numerical features using a scatter plot
         and calculates their correlation.
-        Handles both pandas and cuDF DataFrames by converting to pandas for plotting.
 
         Parameters:
         df (pd.DataFrame): The dataframe containing the data.
@@ -53,11 +45,7 @@ class NumericalVsNumericalAnalysis(BivariateAnalysisStrategy):
         Returns:
         None: Displays a scatter plot and prints the correlation coefficient.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if feature1 not in df_processed.columns or feature2 not in df_processed.columns:
             print(f"Error: One or both features ('{feature1}', '{feature2}') not found in DataFrame.")
@@ -89,7 +77,6 @@ class CategoricalVsNumericalAnalysis(BivariateAnalysisStrategy):
         """
         Analyzes the relationship between a categorical feature and a numerical feature
         using a box plot or violin plot.
-        Handles both pandas and cuDF DataFrames by converting to pandas for plotting.
 
         Parameters:
         df (pd.DataFrame): The dataframe containing the data.
@@ -99,11 +86,7 @@ class CategoricalVsNumericalAnalysis(BivariateAnalysisStrategy):
         Returns:
         None: Displays a box plot or violin plot.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if feature1 not in df_processed.columns or feature2 not in df_processed.columns:
             print(f"Error: One or both features ('{feature1}', '{feature2}') not found in DataFrame.")
@@ -143,7 +126,6 @@ class CategoricalVsCategoricalAnalysis(BivariateAnalysisStrategy):
         """
         Analyzes the relationship between two categorical features using a stacked bar chart
         or a heatmap of a crosstab.
-        Handles both pandas and cuDF DataFrames by converting to pandas for plotting.
 
         Parameters:
         df (pd.DataFrame): The dataframe containing the data.
@@ -153,11 +135,7 @@ class CategoricalVsCategoricalAnalysis(BivariateAnalysisStrategy):
         Returns:
         None: Displays a visualization of the relationship.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if feature1 not in df_processed.columns or feature2 not in df_processed.columns:
             print(f"Error: One or both features ('{feature1}', '{feature2}') not found in DataFrame.")
@@ -236,9 +214,9 @@ if __name__ == "__main__":
 
     print("--- Bivariate Analysis Examples (Real Data) ---")
 
-    # Load raw data (using pandas for independent testing simplicity)
-    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, use_gpu=False, column_dtypes={'ip_address': str})
-    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, use_gpu=False, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
+    # Load raw data
+    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, column_dtypes={'ip_address': str})
+    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
 
     if not fraud_data_df_raw.empty and not ip_country_df_raw.empty:
         # Merge IP addresses to countries

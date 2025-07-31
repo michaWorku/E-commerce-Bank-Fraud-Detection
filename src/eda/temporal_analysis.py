@@ -6,13 +6,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
-# Attempt to import cudf for GPU acceleration
-try:
-    import cudf
-    _CUDF_AVAILABLE_EDA = True
-except ImportError:
-    _CUDF_AVAILABLE_EDA = False
-
 
 # Abstract Base Class for Temporal Analysis Strategy
 # --------------------------------------------------
@@ -43,7 +36,6 @@ class MonthlyTrendAnalysis(TemporalAnalysisStrategy):
     def analyze(self, df: pd.DataFrame, time_column: str, metrics: list):
         """
         Analyzes and visualizes monthly trends for specified numerical metrics.
-        Handles both pandas and cuDF DataFrames by converting to pandas for analysis.
 
         Parameters:
         df (pd.DataFrame): The dataframe containing the time-series data.
@@ -53,11 +45,7 @@ class MonthlyTrendAnalysis(TemporalAnalysisStrategy):
         Returns:
         None: Displays line plots of monthly trends.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if time_column not in df_processed.columns:
             print(f"Error: Time column '{time_column}' not found in DataFrame. Cannot perform temporal analysis.")
@@ -161,9 +149,9 @@ if __name__ == "__main__":
 
     print("--- Temporal Analysis Examples (Real Data) ---")
 
-    # Load raw data (using pandas for independent testing simplicity)
-    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, use_gpu=False, column_dtypes={'ip_address': str})
-    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, use_gpu=False, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
+    # Load raw data
+    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, column_dtypes={'ip_address': str})
+    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
 
     if not fraud_data_df_raw.empty and not ip_country_df_raw.empty:
         # Merge IP addresses to countries

@@ -6,13 +6,6 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Attempt to import cudf for GPU acceleration
-try:
-    import cudf
-    _CUDF_AVAILABLE_EDA = True
-except ImportError:
-    _CUDF_AVAILABLE_EDA = False
-
 
 # Abstract Base Class for Multivariate Analysis
 # ----------------------------------------------
@@ -22,7 +15,6 @@ class MultivariateAnalysisTemplate(ABC):
     def analyze(self, df: pd.DataFrame, features: list = None):
         """
         Perform a comprehensive multivariate analysis by generating a correlation heatmap and pair plot.
-        Handles both pandas and cuDF DataFrames by converting to pandas for plotting.
 
         Parameters:
         df (pd.DataFrame): The dataframe containing the data to be analyzed.
@@ -32,11 +24,7 @@ class MultivariateAnalysisTemplate(ABC):
         Returns:
         None: This method orchestrates the multivariate analysis process.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if df_processed.empty:
             print("DataFrame is empty. Cannot perform multivariate analysis.")
@@ -131,7 +119,7 @@ if __name__ == "__main__":
     # Add project root to sys.path to allow absolute imports for testing
     project_root = Path(__file__).parent.parent.parent
     if str(project_root) not in sys.path:
-        sys.sys.path.append(str(project_root))
+        sys.path.append(str(project_root))
 
     from src.data_processing.loader import load_data
     from src.utils.helpers import merge_ip_to_country
@@ -142,9 +130,9 @@ if __name__ == "__main__":
 
     print("--- Multivariate Analysis Examples (Real Data) ---")
 
-    # Load raw data (using pandas for independent testing simplicity)
-    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, use_gpu=False, column_dtypes={'ip_address': str})
-    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, use_gpu=False, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
+    # Load raw data
+    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, column_dtypes={'ip_address': str})
+    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
 
     if not fraud_data_df_raw.empty and not ip_country_df_raw.empty:
         # Merge IP addresses to countries

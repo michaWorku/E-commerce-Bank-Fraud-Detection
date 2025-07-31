@@ -6,13 +6,6 @@ import pandas as pd
 import seaborn as sns
 import numpy as np # For np.nan
 
-# Attempt to import cudf for GPU acceleration
-try:
-    import cudf
-    _CUDF_AVAILABLE_EDA = True
-except ImportError:
-    _CUDF_AVAILABLE_EDA = False
-
 
 # Abstract Base Class for Missing Values Analysis
 # -----------------------------------------------
@@ -22,7 +15,6 @@ class MissingValuesAnalysisTemplate(ABC):
     def analyze(self, df: pd.DataFrame):
         """
         Performs a complete missing values analysis by identifying and visualizing missing values.
-        Handles both pandas and cuDF DataFrames by converting to pandas for analysis.
 
         Parameters:
         df (pd.DataFrame): The dataframe to be analyzed.
@@ -30,11 +22,7 @@ class MissingValuesAnalysisTemplate(ABC):
         Returns:
         None: This method performs the analysis and visualizes missing values.
         """
-        # Convert to pandas if input is cuDF
-        if _CUDF_AVAILABLE_EDA and isinstance(df, cudf.DataFrame):
-            df_processed = df.to_pandas()
-        else:
-            df_processed = df.copy()
+        df_processed = df.copy()
 
         if df_processed.empty:
             print("DataFrame is empty. Cannot perform missing values analysis.")
@@ -128,8 +116,8 @@ if __name__ == "__main__":
 
     # Example 1: Fraud Data
     print("\n--- Missing Values Analysis for E-commerce Fraud Data ---")
-    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, use_gpu=False, column_dtypes={'ip_address': str})
-    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, use_gpu=False, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
+    fraud_data_df_raw = load_data(FRAUD_DATA_PATH, column_dtypes={'ip_address': str})
+    ip_country_df_raw = load_data(IP_TO_COUNTRY_PATH, column_dtypes={'lower_bound_ip_address': str, 'upper_bound_ip_address': str})
 
     if not fraud_data_df_raw.empty and not ip_country_df_raw.empty:
         fraud_df_merged = merge_ip_to_country(fraud_data_df_raw.copy(), ip_country_df_raw.copy())
@@ -146,7 +134,7 @@ if __name__ == "__main__":
 
     # Example 2: Credit Card Data (known to have missing values in some contexts)
     print("\n--- Missing Values Analysis for Bank Credit Card Fraud Data ---")
-    creditcard_df_raw = load_data(CREDITCARD_DATA_PATH, use_gpu=False)
+    creditcard_df_raw = load_data(CREDITCARD_DATA_PATH)
 
     if not creditcard_df_raw.empty:
         # Simulate preprocessing steps that might introduce NaNs if they are not already present

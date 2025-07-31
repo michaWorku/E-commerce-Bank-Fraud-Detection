@@ -9,6 +9,12 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 from src.models.base_model_strategy import BaseModelStrategy
+# Import specific model strategies to allow type checking in set_strategy
+from src.models.logistic_regression_strategy import LogisticRegressionStrategy
+from src.models.decision_tree_strategy import DecisionTreeStrategy
+from src.models.random_forest_strategy import RandomForestStrategy
+from src.models.xgboost_strategy import XGBoostStrategy
+from src.models.lightgbm_strategy import LightGBMStrategy # NEW: Import LightGBMStrategy
 
 
 class ModelTrainer:

@@ -167,3 +167,6 @@ logs/
 *.temp
 
 /data
+
+/mlruns
+/exported_models

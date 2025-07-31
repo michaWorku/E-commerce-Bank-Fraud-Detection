@@ -11,7 +11,7 @@ plotly
 # Machine learning libraries
 scikit-learn
 lightgbm # Or 
-# xgboost
+xgboost
 imbalanced-learn # For handling class imbalance (e.g., SMOTE)
 
 # Model Interpretability
@@ -22,6 +22,9 @@ ipykernel
 jupyter
 python-dotenv
 
+tqdm
+mlflow
+cloudpickle
 
 # Development and testing tools (optional, but good practice)
 pytest # For unit and integration testing
